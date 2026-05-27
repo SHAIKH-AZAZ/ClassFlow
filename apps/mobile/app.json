@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "Institute Zoom LMS",
+    "slug": "institute-zoom-lms",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "zoomlms",
+    "platforms": ["ios", "android"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.institute.zoomlms"
+    },
+    "android": {
+      "package": "com.institute.zoomlms"
+    },
+    "extra": {
+      "supabaseUrl": "",
+      "supabaseAnonKey": ""
+    }
+  }
+}

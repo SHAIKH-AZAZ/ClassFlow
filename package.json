@@ -1,0 +1,22 @@
+{
+  "name": "zoom-lms-platform",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Single-institute LMS with Zoom classes, Supabase auth/data, Google Drive storage, and Expo mobile app.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun --filter web dev",
+    "dev:mobile": "bun --filter mobile start",
+    "dev:worker": "bun --filter worker dev",
+    "build": "bun --filter @zoom-lms/shared build && bun --filter web build && bun --filter worker build",
+    "lint": "bun --filter web lint",
+    "typecheck": "bun --filter '*' typecheck",
+    "db:schema": "supabase db push"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
