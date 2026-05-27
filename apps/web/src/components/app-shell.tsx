@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { AuthBar } from "./auth-bar";
 
 const navItems = [
   ["Dashboard", "/"],
@@ -20,6 +21,9 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
             </a>
           ))}
         </nav>
+        <div className="sidebar-footer">
+          <AuthBar />
+        </div>
       </aside>
       <section className="content">{children}</section>
     </main>

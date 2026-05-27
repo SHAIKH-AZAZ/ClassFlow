@@ -1,4 +1,5 @@
 import { google, type drive_v3 } from "googleapis";
+import { Readable } from "node:stream";
 import { requireEnv } from "./env";
 
 let driveClient: drive_v3.Drive | null = null;
@@ -43,4 +44,35 @@ export async function ensureDriveFolder(name: string, parentId: string) {
   }
 
   return created.data.id;
+}
+
+export async function uploadFileToDrive(input: {
+  name: string;
+  mimeType: string;
+  parentId: string;
+  file: File;
+}) {
+  const drive = getDriveClient();
+  const created = await drive.files.create({
+    requestBody: {
+      name: input.name,
+      parents: [input.parentId]
+    },
+    media: {
+      mimeType: input.mimeType,
+      body: Readable.fromWeb(input.file.stream() as any)
+    },
+    fields: "id, webViewLink, webContentLink, size"
+  });
+
+  if (!created.data.id) {
+    throw new Error("Google Drive upload did not return a file id.");
+  }
+
+  return {
+    id: created.data.id,
+    viewUrl: created.data.webViewLink ?? null,
+    downloadUrl: created.data.webContentLink ?? null,
+    size: created.data.size ? Number(created.data.size) : input.file.size
+  };
 }

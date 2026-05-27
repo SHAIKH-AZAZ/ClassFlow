@@ -60,7 +60,7 @@ export async function createZoomMeeting(input: CreateZoomMeetingInput) {
         join_before_host: false,
         waiting_room: true,
         approval_type: 0,
-        auto_recording: "cloud"
+        auto_recording: process.env.ZOOM_AUTO_RECORDING ?? "none"
       }
     })
   });
