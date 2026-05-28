@@ -13,26 +13,16 @@ export function AuthBar({ initialProfile }: Readonly<{ initialProfile: Profile |
     let alive = true;
 
     async function loadProfile() {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const user = sessionData.session?.user;
-      if (!user) {
-        if (alive) {
-          setProfile(null);
-          setLoading(false);
-        }
+      const res = await fetch("/api/auth/session", { credentials: "include" });
+      if (!alive) return;
+      if (!res.ok) {
+        setProfile(null);
+        setLoading(false);
         return;
       }
-
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, email, full_name, role, active")
-        .eq("id", user.id)
-        .single();
-
-      if (alive) {
-        setProfile(data?.active ? (data as Profile) : null);
-        setLoading(false);
-      }
+      const json = (await res.json()) as { profile: Profile | null };
+      setProfile(json.profile);
+      setLoading(false);
     }
 
     loadProfile();
@@ -48,6 +38,7 @@ export function AuthBar({ initialProfile }: Readonly<{ initialProfile: Profile |
 
   async function signOut() {
     await supabase.auth.signOut();
+    await fetch("/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => {});
     window.location.href = "/login";
   }
 

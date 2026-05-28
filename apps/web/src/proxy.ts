@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 import { type NextRequest, NextResponse } from "next/server";
 import { getAllowedRolesForPath, getRoleHome, isRoleAllowed, type Profile } from "@/lib/auth-constants";
 
@@ -35,7 +36,15 @@ export async function proxy(request: NextRequest) {
 
   let profile: Profile | null = null;
   if (user) {
-    const { data } = await supabase
+    // Use a service-role client (bypasses RLS) to fetch the profile.
+    // The user is already authenticated above; this is just a role lookup
+    // to decide whether the request is allowed to reach the page.
+    const admin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
+      process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+      { auth: { persistSession: false, autoRefreshToken: false } }
+    );
+    const { data } = await admin
       .from("profiles")
       .select("id, email, full_name, role, active")
       .eq("id", user.id)

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import type { User } from "@supabase/supabase-js";
 import { getRoleHome, isRoleAllowed, type AppRole, type Profile } from "./auth-constants";
 import { getSupabaseServerClient } from "./supabase-server";
+import { getSupabaseAdmin } from "./supabase-admin";
 
 type AuthContext = {
   user: User | null;
@@ -19,7 +20,11 @@ export async function getCurrentAuthContext(): Promise<AuthContext> {
     return { user: null, profile: null };
   }
 
-  const { data: profile } = await supabase
+  // Use the service-role client to read the profile so this works
+  // regardless of how RLS policies are configured. The user is already
+  // authenticated via Supabase auth above; this just enriches the context.
+  const admin = getSupabaseAdmin();
+  const { data: profile } = await admin
     .from("profiles")
     .select("id, email, full_name, role, active")
     .eq("id", user.id)
@@ -68,13 +73,13 @@ export async function requireApiRole(roles: AppRole[]) {
 }
 
 export async function getFacultyProfileIdForUser(userId: string) {
-  const supabase = await getSupabaseServerClient();
-  const { data } = await supabase.from("faculty_profiles").select("id").eq("user_id", userId).maybeSingle<{ id: string }>();
+  const admin = getSupabaseAdmin();
+  const { data } = await admin.from("faculty_profiles").select("id").eq("user_id", userId).maybeSingle<{ id: string }>();
   return data?.id ?? null;
 }
 
 export async function getStudentProfileIdForUser(userId: string) {
-  const supabase = await getSupabaseServerClient();
-  const { data } = await supabase.from("student_profiles").select("id").eq("user_id", userId).maybeSingle<{ id: string }>();
+  const admin = getSupabaseAdmin();
+  const { data } = await admin.from("student_profiles").select("id").eq("user_id", userId).maybeSingle<{ id: string }>();
   return data?.id ?? null;
 }

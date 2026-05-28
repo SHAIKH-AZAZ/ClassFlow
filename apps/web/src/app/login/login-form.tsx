@@ -1,7 +1,8 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { getRoleHome } from "@/lib/auth-constants";
+import { useSearchParams } from "next/navigation";
+import { getRoleHome, type AppRole } from "@/lib/auth-constants";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 export function LoginForm() {
@@ -10,31 +11,44 @@ export function LoginForm() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const supabase = getSupabaseBrowserClient();
+  const search = useSearchParams();
+  const next = search?.get("next") ?? null;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
     setMessage("");
 
+    // Sign in client-side first so the browser cookie store has the session.
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password
     });
 
-    if (error) {
-      setMessage(error.message);
+    if (error || !data.session) {
+      setMessage(error?.message ?? "Sign in failed.");
       setLoading(false);
       return;
     }
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", data.user.id)
-      .single();
+    // Mirror the session into HTTP-only cookies via the server route, so
+    // proxy / page guards / API guards see it on the very next request.
+    await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, password }),
+      credentials: "include"
+    }).catch(() => null);
 
-    setMessage(`Signed in as ${profile?.role ?? "user"}. Redirecting...`);
-    window.location.href = getRoleHome(profile?.role);
+    // Pull role from /api/auth/session, which uses service-role server-side.
+    const sessionResp = await fetch("/api/auth/session", { credentials: "include" });
+    const sessionJson = (await sessionResp.json().catch(() => ({}))) as {
+      profile?: { role?: AppRole };
+    };
+    const role = sessionJson.profile?.role;
+
+    setMessage(`Signed in as ${role ?? "user"}. Redirecting...`);
+    window.location.href = next ?? getRoleHome(role);
   }
 
   return (
