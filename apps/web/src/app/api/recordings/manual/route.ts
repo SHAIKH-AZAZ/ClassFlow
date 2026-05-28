@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { ensureDriveFolder, uploadFileToDrive } from "@/lib/google-drive";
 import { requireEnv } from "@/lib/env";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { getFacultyProfileIdForUser, requireApiRole } from "@/lib/auth-server";
 
 export const runtime = "nodejs";
 
@@ -10,13 +11,15 @@ function safeFolderName(value: string) {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireApiRole(["admin", "faculty"]);
+  if (auth.error) return auth.error;
+
   const formData = await request.formData();
   const lectureId = String(formData.get("lectureId") ?? "");
-  const uploadedBy = String(formData.get("uploadedBy") ?? "");
   const file = formData.get("file");
 
-  if (!lectureId || !uploadedBy || !(file instanceof File)) {
-    return NextResponse.json({ error: "lectureId, uploadedBy, and file are required." }, { status: 400 });
+  if (!lectureId || !(file instanceof File)) {
+    return NextResponse.json({ error: "lectureId and file are required." }, { status: 400 });
   }
 
   if (!file.type.startsWith("video/")) {
@@ -26,12 +29,19 @@ export async function POST(request: Request) {
   const supabase = getSupabaseAdmin();
   const { data: lecture, error: lectureError } = await supabase
     .from("lectures")
-    .select("id, title, starts_at, groups(name, code), zoom_meetings(zoom_meeting_id)")
+    .select("id, title, faculty_id, starts_at, groups(name, code), zoom_meetings(zoom_meeting_id)")
     .eq("id", lectureId)
     .single();
 
   if (lectureError || !lecture) {
     return NextResponse.json({ error: lectureError?.message ?? "Lecture not found." }, { status: 404 });
+  }
+
+  if (auth.profile.role === "faculty") {
+    const facultyProfileId = await getFacultyProfileIdForUser(auth.user.id);
+    if (!facultyProfileId || facultyProfileId !== lecture.faculty_id) {
+      return NextResponse.json({ error: "Faculty can only upload recordings for their own lectures." }, { status: 403 });
+    }
   }
 
   const group = Array.isArray(lecture.groups) ? lecture.groups[0] : lecture.groups;
@@ -72,7 +82,7 @@ export async function POST(request: Request) {
   }
 
   await supabase.from("system_logs").insert({
-    actor_id: uploadedBy,
+    actor_id: auth.profile.id,
     action: "recording.manual_upload",
     entity_type: "recordings",
     entity_id: recording.id,

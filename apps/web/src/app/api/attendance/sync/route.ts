@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { calculateAttendanceStatus, minutesBetween } from "@/lib/attendance";
+import { getFacultyProfileIdForUser, requireApiRole } from "@/lib/auth-server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { listZoomParticipants } from "@/lib/zoom";
 
@@ -8,17 +9,27 @@ type AttendanceSyncInput = {
 };
 
 export async function POST(request: Request) {
+  const auth = await requireApiRole(["admin", "faculty"]);
+  if (auth.error) return auth.error;
+
   const { lectureId } = (await request.json()) as AttendanceSyncInput;
   const supabase = getSupabaseAdmin();
 
   const { data: lecture, error: lectureError } = await supabase
     .from("lectures")
-    .select("id, group_id, starts_at, ends_at, attendance_threshold_percent, zoom_meetings(zoom_meeting_id)")
+    .select("id, group_id, faculty_id, starts_at, ends_at, attendance_threshold_percent, zoom_meetings(zoom_meeting_id)")
     .eq("id", lectureId)
     .single();
 
   if (lectureError || !lecture) {
     return NextResponse.json({ error: lectureError?.message ?? "Lecture not found." }, { status: 404 });
+  }
+
+  if (auth.profile.role === "faculty") {
+    const facultyProfileId = await getFacultyProfileIdForUser(auth.user.id);
+    if (!facultyProfileId || facultyProfileId !== lecture.faculty_id) {
+      return NextResponse.json({ error: "Faculty can only sync attendance for their own lectures." }, { status: 403 });
+    }
   }
 
   const zoomMeeting = Array.isArray(lecture.zoom_meetings) ? lecture.zoom_meetings[0] : lecture.zoom_meetings;

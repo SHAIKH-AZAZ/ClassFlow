@@ -1,41 +1,20 @@
 import { AppShell } from "@/components/app-shell";
+import { requirePageRole } from "@/lib/auth-server";
+import { ReportsClient } from "./reports-client";
 
-const reports = [
-  ["Attendance report", "Zoom duration threshold plus faculty overrides"],
-  ["Meeting history", "Lecture schedule, start links, join links, recordings"],
-  ["Storage status", "Drive folders, resource metadata, recording uploads"],
-  ["System logs", "Admin, integration, webhook, and worker events"]
-];
+export default async function ReportsPage() {
+  await requirePageRole(["admin", "faculty"], "/reports");
 
-export default function ReportsPage() {
   return (
     <AppShell>
       <div className="toolbar">
         <div>
           <p className="eyebrow">Reports</p>
-          <h1>Export-ready institute records</h1>
-          <p className="muted">Reports should be filtered by group, lecture date range, faculty, and attendance status.</p>
+          <h1>Institute summary</h1>
+          <p className="muted">Live counts across users, lectures, attendance, storage, and recording jobs.</p>
         </div>
       </div>
-
-      <article className="card">
-        <table>
-          <thead>
-            <tr>
-              <th>Report</th>
-              <th>Data source</th>
-            </tr>
-          </thead>
-          <tbody>
-            {reports.map(([name, source]) => (
-              <tr key={name}>
-                <td>{name}</td>
-                <td className="muted">{source}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </article>
+      <ReportsClient />
     </AppShell>
   );
 }

@@ -1,76 +1,45 @@
 import { AppShell } from "@/components/app-shell";
+import { getFacultyProfileIdForUser, requirePageRole } from "@/lib/auth-server";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { FacultyClient } from "./faculty-client";
 
-const actions = [
-  "Schedule lecture and create Zoom meeting",
-  "Start class from Zoom host link",
-  "Upload local Zoom recordings to Google Drive",
-  "Review attendance and apply corrections",
-  "Send group notices and student remarks"
-];
+export default async function FacultyPage({
+  searchParams
+}: Readonly<{ searchParams: Promise<Record<string, string | string[] | undefined>> }>) {
+  const { user, profile } = await requirePageRole(["admin", "faculty"], "/faculty");
+  const supabase = await getSupabaseServerClient();
 
-export default function FacultyPage() {
+  const facultyProfileId = profile.role === "faculty" ? await getFacultyProfileIdForUser(user.id) : null;
+
+  const params = await searchParams;
+  const tab = (Array.isArray(params?.tab) ? params.tab[0] : params?.tab) ?? "lectures";
+
+  const [{ data: groups }, { data: faculties }] = await Promise.all([
+    supabase.from("groups").select("id, name, code").eq("active", true).order("name"),
+    supabase.from("faculty_profiles").select("id, zoom_host_user_id, profiles(full_name)").order("created_at")
+  ]);
+
   return (
     <AppShell>
       <div className="toolbar">
         <div>
           <p className="eyebrow">Faculty workspace</p>
-          <h1>Lectures, resources, attendance</h1>
-          <p className="muted">Faculty actions are constrained by assigned groups and mapped Zoom host accounts.</p>
+          <h1>Lectures, recordings, attendance</h1>
+          <p className="muted">Schedule classes, capture local recordings, and review attendance.</p>
         </div>
         <span className="badge live">Zoom ready</span>
       </div>
 
-      <section className="grid stats">
-        {actions.map((action, index) => (
-          <article className="card" key={action}>
-            <div className="stat-value">{index + 1}</div>
-            <div>{action}</div>
-          </article>
-        ))}
-      </section>
-
-      <section className="grid two" style={{ marginTop: 16 }}>
-        <article className="card">
-          <h2>Upload Local Recording</h2>
-          <p className="muted">
-            For Zoom Basic, record to computer during class, then upload the saved video here.
-          </p>
-          <form action="/api/recordings/manual" method="post" encType="multipart/form-data" className="form">
-            <label>
-              Lecture ID
-              <input name="lectureId" required placeholder="8057b4bd-8835-405a-9c3d-9ed43519e125" />
-            </label>
-            <label>
-              Uploaded by profile ID
-              <input name="uploadedBy" required placeholder="4fdf13f2-a475-4212-9743-4a758b1a63f0" />
-            </label>
-            <label>
-              Recording file
-              <input name="file" type="file" accept="video/*" required />
-            </label>
-            <button className="button" type="submit">
-              Upload recording
-            </button>
-          </form>
-        </article>
-
-        <article className="card">
-          <h2>Basic Zoom Recording Flow</h2>
-          <div className="timeline">
-            {[
-              "Faculty starts the Zoom class",
-              "Zoom records to the faculty computer",
-              "Faculty uploads the local video file",
-              "The app stores it in Drive and saves the link for students"
-            ].map((item, index) => (
-              <div className="timeline-item" key={item}>
-                <strong>Step {index + 1}</strong>
-                <div className="muted">{item}</div>
-              </div>
-            ))}
-          </div>
-        </article>
-      </section>
+      <FacultyClient
+        initialTab={tab as string}
+        role={profile.role as "admin" | "faculty"}
+        facultyProfileId={facultyProfileId}
+        groups={(groups ?? []).map((g: any) => ({ id: g.id, name: g.name, code: g.code }))}
+        faculties={(faculties ?? []).map((f: any) => {
+          const p = Array.isArray(f.profiles) ? f.profiles[0] : f.profiles;
+          return { id: f.id, fullName: p?.full_name ?? "Faculty", zoomHostUserId: f.zoom_host_user_id };
+        })}
+      />
     </AppShell>
   );
 }

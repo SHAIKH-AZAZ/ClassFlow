@@ -1,44 +1,25 @@
 import { AppShell } from "@/components/app-shell";
+import { requirePageRole } from "@/lib/auth-server";
+import { AdminClient } from "./admin-client";
 
-const rows = [
-  ["Faculty", "Create host profiles, map Zoom users, assign groups"],
-  ["Students", "Invite Gmail users, enable OTP login, enroll in groups"],
-  ["Groups", "Manage class batches and app-level file access"],
-  ["Permissions", "Admin, faculty, and student role boundaries"]
-];
+export default async function AdminPage({
+  searchParams
+}: Readonly<{ searchParams: Promise<Record<string, string | string[] | undefined>> }>) {
+  await requirePageRole(["admin"], "/admin");
+  const params = await searchParams;
+  const tab = (Array.isArray(params?.tab) ? params.tab[0] : params?.tab) ?? "users";
 
-export default function AdminPage() {
   return (
     <AppShell>
       <div className="toolbar">
         <div>
           <p className="eyebrow">Administration</p>
-          <h1>Users, groups, and permissions</h1>
-          <p className="muted">Supabase Auth owns identity; profile tables own institute roles and enrollment.</p>
+          <h1>Users, groups, and settings</h1>
+          <p className="muted">Provision identities, manage class batches, and connect integrations.</p>
         </div>
-        <a className="button" href="/api/auth/session">
-          Check session
-        </a>
       </div>
 
-      <article className="card">
-        <table>
-          <thead>
-            <tr>
-              <th>Area</th>
-              <th>Scope</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(([area, scope]) => (
-              <tr key={area}>
-                <td>{area}</td>
-                <td className="muted">{scope}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </article>
+      <AdminClient initialTab={tab as string} />
     </AppShell>
   );
 }

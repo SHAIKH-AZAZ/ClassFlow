@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { getRoleHome } from "@/lib/auth-constants";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 export function LoginForm() {
@@ -33,7 +34,7 @@ export function LoginForm() {
       .single();
 
     setMessage(`Signed in as ${profile?.role ?? "user"}. Redirecting...`);
-    window.location.href = profile?.role === "faculty" ? "/faculty" : "/";
+    window.location.href = getRoleHome(profile?.role);
   }
 
   return (

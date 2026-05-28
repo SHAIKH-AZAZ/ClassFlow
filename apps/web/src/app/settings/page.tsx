@@ -1,31 +1,46 @@
 import { AppShell } from "@/components/app-shell";
+import { requirePageRole } from "@/lib/auth-server";
+import { SettingsClient } from "./settings-client";
 
-const integrations = [
-  ["Supabase", "Auth, PostgreSQL, RLS, Realtime chat"],
-  ["Zoom", "Server-to-server OAuth, meetings, reports, recording webhooks"],
-  ["Google Drive", "Admin account folders, resources, recording storage"],
-  ["VPS worker", "Long-running recording download and upload jobs"]
-];
+export default async function SettingsPage() {
+  await requirePageRole(["admin"], "/settings");
 
-export default function SettingsPage() {
+  const integrationStatus = {
+    supabase: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY),
+    zoom: Boolean(process.env.ZOOM_ACCOUNT_ID && process.env.ZOOM_CLIENT_ID && process.env.ZOOM_CLIENT_SECRET),
+    zoomWebhook: Boolean(process.env.ZOOM_WEBHOOK_SECRET_TOKEN),
+    googleDrive: Boolean(
+      process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID && process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
+    )
+  };
+
   return (
     <AppShell>
       <div className="toolbar">
         <div>
           <p className="eyebrow">Integrations</p>
           <h1>Platform connections</h1>
-          <p className="muted">Secrets stay server-side; mobile clients use Supabase anon access with RLS.</p>
+          <p className="muted">Server-side credentials drive Zoom, Google Drive, and the recording worker.</p>
         </div>
       </div>
 
-      <section className="grid two">
-        {integrations.map(([name, body]) => (
-          <article className="card" key={name}>
-            <h2>{name}</h2>
-            <p className="muted">{body}</p>
+      <section className="grid stats" aria-label="Integration status">
+        {[
+          { label: "Supabase", ok: integrationStatus.supabase },
+          { label: "Zoom OAuth", ok: integrationStatus.zoom },
+          { label: "Zoom Webhook", ok: integrationStatus.zoomWebhook },
+          { label: "Google Drive", ok: integrationStatus.googleDrive }
+        ].map((row) => (
+          <article className="card" key={row.label}>
+            <div className="stat-value" style={{ color: row.ok ? "var(--accent)" : "var(--danger)" }}>
+              {row.ok ? "Configured" : "Missing"}
+            </div>
+            <div className="muted">{row.label}</div>
           </article>
         ))}
       </section>
+
+      <SettingsClient />
     </AppShell>
   );
 }

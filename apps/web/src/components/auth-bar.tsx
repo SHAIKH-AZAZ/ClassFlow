@@ -1,16 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { Profile } from "@/lib/auth-constants";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
-type ProfileState = {
-  full_name: string;
-  role: string;
-  email: string | null;
-} | null;
-
-export function AuthBar() {
-  const [profile, setProfile] = useState<ProfileState>(null);
+export function AuthBar({ initialProfile }: Readonly<{ initialProfile: Profile | null }>) {
+  const [profile, setProfile] = useState<Profile | null>(initialProfile);
   const [loading, setLoading] = useState(true);
   const supabase = getSupabaseBrowserClient();
 
@@ -30,12 +25,12 @@ export function AuthBar() {
 
       const { data } = await supabase
         .from("profiles")
-        .select("full_name, role, email")
+        .select("id, email, full_name, role, active")
         .eq("id", user.id)
         .single();
 
       if (alive) {
-        setProfile(data ?? { full_name: user.email ?? "Signed in", role: "unknown", email: user.email ?? null });
+        setProfile(data?.active ? (data as Profile) : null);
         setLoading(false);
       }
     }
