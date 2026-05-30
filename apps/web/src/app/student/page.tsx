@@ -1,20 +1,20 @@
 import { AppShell } from "@/components/app-shell";
 import { requirePageRole } from "@/lib/auth-server";
-import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { StudentClient } from "./student-client";
 
 export default async function StudentPage() {
   const { user } = await requirePageRole(["admin", "student"], "/student");
-  const supabase = await getSupabaseServerClient();
+  const admin = getSupabaseAdmin();
 
-  const { data: student } = await supabase
+  const { data: student } = await admin
     .from("student_profiles")
     .select("id, roll_number")
     .eq("user_id", user.id)
     .maybeSingle();
 
   const { data: enrollments } = student
-    ? await supabase.from("group_students").select("groups(id, name, code)").eq("student_id", student.id)
+    ? await admin.from("group_students").select("groups(id, name, code)").eq("student_id", student.id)
     : { data: [] };
 
   const groupRows = (enrollments ?? []).map((row: any) => {

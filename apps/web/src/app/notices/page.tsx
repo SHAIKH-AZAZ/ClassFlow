@@ -1,16 +1,16 @@
 import { AppShell } from "@/components/app-shell";
 import { requirePageRole } from "@/lib/auth-server";
-import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { NoticesClient } from "./notices-client";
 
 export default async function NoticesPage() {
   const { profile } = await requirePageRole(["admin", "faculty", "student"], "/notices");
-  const supabase = await getSupabaseServerClient();
+  const admin = getSupabaseAdmin();
 
   const { data: groups } =
     profile.role === "student"
       ? { data: [] as { id: string; name: string; code: string }[] }
-      : await supabase.from("groups").select("id, name, code").eq("active", true).order("name");
+      : await admin.from("groups").select("id, name, code").eq("active", true).order("name");
 
   return (
     <AppShell>

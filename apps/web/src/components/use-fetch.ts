@@ -101,3 +101,10 @@ export function formatBytes(bytes: number | null | undefined) {
   }
   return `${value.toFixed(value >= 10 || i === 0 ? 0 : 1)} ${units[i]}`;
 }
+
+// PostgREST returns one-to-one joins as a single object when there's a unique
+// constraint, but as an array otherwise. Normalize both into a single object.
+export function firstRel<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}

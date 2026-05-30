@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { apiCall, useApiFetch } from "@/components/use-fetch";
+import { apiCall, firstRel, useApiFetch } from "@/components/use-fetch";
 
 type Group = {
   id: string;
@@ -17,16 +17,26 @@ type StudentOption = {
   email: string | null;
   full_name: string;
   role: "admin" | "faculty" | "student";
-  student_profiles?: { id: string; roll_number: string | null }[] | null;
+  student_profiles?:
+    | { id: string; roll_number: string | null }
+    | { id: string; roll_number: string | null }[]
+    | null;
 };
 
 type EnrollmentRow = {
   student_id: string;
-  student_profiles: {
-    id: string;
-    roll_number: string | null;
-    profiles: { id: string; email: string | null; full_name: string };
-  } | null;
+  student_profiles:
+    | {
+        id: string;
+        roll_number: string | null;
+        profiles: { id: string; email: string | null; full_name: string };
+      }
+    | {
+        id: string;
+        roll_number: string | null;
+        profiles: { id: string; email: string | null; full_name: string };
+      }[]
+    | null;
 };
 
 export function GroupsTab() {
@@ -162,7 +172,12 @@ function EnrollmentPanel({
   );
   const [studentId, setStudentId] = useState("");
 
-  const studentOptions = students.filter((s) => s.role === "student" && s.student_profiles?.[0]);
+  const studentOptions = students
+    .filter((s) => s.role === "student" && firstRel(s.student_profiles))
+    .map((s) => {
+      const sp = firstRel(s.student_profiles)!;
+      return { id: sp.id, fullName: s.full_name, rollNumber: sp.roll_number, email: s.email };
+    });
 
   async function add() {
     if (!studentId) return;
@@ -201,14 +216,12 @@ function EnrollmentPanel({
           Add student
           <select value={studentId} onChange={(e) => setStudentId(e.target.value)}>
             <option value="">Select student…</option>
-            {studentOptions.map((option) => {
-              const sp = option.student_profiles?.[0];
-              return (
-                <option key={sp?.id} value={sp?.id ?? ""}>
-                  {option.full_name} {sp?.roll_number ? `(${sp.roll_number})` : ""}
-                </option>
-              );
-            })}
+            {studentOptions.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.fullName}
+                {option.rollNumber ? ` (${option.rollNumber})` : ""}
+              </option>
+            ))}
           </select>
         </label>
         <div style={{ display: "flex", alignItems: "end" }}>
@@ -234,12 +247,8 @@ function EnrollmentPanel({
           </thead>
           <tbody>
             {data.enrollments.map((row) => {
-              const sp = Array.isArray(row.student_profiles) ? row.student_profiles[0] : row.student_profiles;
-              const profile = sp?.profiles
-                ? Array.isArray(sp.profiles)
-                  ? sp.profiles[0]
-                  : sp.profiles
-                : null;
+              const sp = firstRel(row.student_profiles);
+              const profile = firstRel(sp?.profiles);
               return (
                 <tr key={row.student_id}>
                   <td>{profile?.full_name ?? "Unknown"}</td>

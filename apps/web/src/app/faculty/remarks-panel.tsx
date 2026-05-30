@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { apiCall, formatDateTime, useApiFetch } from "@/components/use-fetch";
+import { apiCall, firstRel, formatDateTime, useApiFetch } from "@/components/use-fetch";
 
 type Remark = {
   id: string;
@@ -20,7 +20,10 @@ type Student = {
   id: string;
   full_name: string;
   role: string;
-  student_profiles?: { id: string; roll_number: string | null }[] | null;
+  student_profiles?:
+    | { id: string; roll_number: string | null }
+    | { id: string; roll_number: string | null }[]
+    | null;
 };
 
 export function RemarksPanel() {
@@ -53,8 +56,9 @@ export function RemarksPanel() {
   }
 
   const studentOptions = (studentsData?.profiles ?? [])
-    .filter((u) => u.role === "student" && u.student_profiles?.[0])
-    .map((u) => ({ id: u.student_profiles![0].id, name: u.full_name, roll: u.student_profiles![0].roll_number }));
+    .map((u) => ({ user: u, sp: firstRel(u.student_profiles) }))
+    .filter(({ user, sp }) => user.role === "student" && sp)
+    .map(({ user, sp }) => ({ id: sp!.id, name: user.full_name, roll: sp!.roll_number }));
 
   const remarks = data?.remarks ?? [];
 

@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { roles } from "@zoom-lms/shared";
-import { apiCall, formatDate, useApiFetch } from "@/components/use-fetch";
+import { apiCall, firstRel, formatDate, useApiFetch } from "@/components/use-fetch";
 
 type AdminUser = {
   id: string;
@@ -12,8 +12,14 @@ type AdminUser = {
   active: boolean;
   phone: string | null;
   created_at: string;
-  faculty_profiles?: { id: string; employee_code: string | null; department: string | null; zoom_host_user_id: string | null }[] | null;
-  student_profiles?: { id: string; roll_number: string | null; guardian_phone: string | null }[] | null;
+  faculty_profiles?:
+    | { id: string; employee_code: string | null; department: string | null; zoom_host_user_id: string | null }
+    | { id: string; employee_code: string | null; department: string | null; zoom_host_user_id: string | null }[]
+    | null;
+  student_profiles?:
+    | { id: string; roll_number: string | null; guardian_phone: string | null }
+    | { id: string; roll_number: string | null; guardian_phone: string | null }[]
+    | null;
 };
 
 const initialFormState = {
@@ -95,7 +101,7 @@ export function UsersTab() {
 
   async function setZoomHost(user: AdminUser) {
     if (user.role !== "faculty") return;
-    const current = user.faculty_profiles?.[0]?.zoom_host_user_id ?? "";
+    const current = firstRel(user.faculty_profiles)?.zoom_host_user_id ?? "";
     const value = window.prompt("Zoom host user id (email or Zoom user id):", current);
     if (value === null) return;
     try {
@@ -237,9 +243,11 @@ export function UsersTab() {
             </thead>
             <tbody>
               {filtered.map((user) => {
-                const facultyId = user.faculty_profiles?.[0]?.id;
-                const studentRoll = user.student_profiles?.[0]?.roll_number;
-                const zoomHost = user.faculty_profiles?.[0]?.zoom_host_user_id;
+                const facultyRel = firstRel(user.faculty_profiles);
+                const studentRel = firstRel(user.student_profiles);
+                const facultyId = facultyRel?.id;
+                const studentRoll = studentRel?.roll_number;
+                const zoomHost = facultyRel?.zoom_host_user_id;
                 return (
                   <tr key={user.id}>
                     <td>
