@@ -105,16 +105,39 @@ export function LecturesPanel({
     const ok = await confirmAction({
       title: `Sync attendance for "${lecture.title}"?`,
       description:
-        "This pulls participant durations from Zoom and overwrites the attendance rows for this lecture.",
+        "This pulls participant durations from Zoom and overwrites the attendance rows for this lecture. Requires a Paid Zoom plan.",
       confirmLabel: "Sync from Zoom"
     });
     if (!ok) return;
     try {
-      const resp = await apiCall<{ synced: number }>("/api/attendance/sync", {
+      const resp = await apiCall<{ synced: number; notice?: string | null }>("/api/attendance/sync", {
         method: "POST",
         body: JSON.stringify({ lectureId: lecture.id })
       });
-      alert(`Synced ${resp.synced} attendance rows.`);
+      const lines = [`Synced ${resp.synced} attendance row${resp.synced === 1 ? "" : "s"}.`];
+      if (resp.notice) lines.push(resp.notice);
+      alert(lines.join("\n\n"));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed.");
+    }
+  }
+
+  async function seedAttendance(lecture: Lecture) {
+    const ok = await confirmAction({
+      title: `Mark attendance manually for "${lecture.title}"?`,
+      description:
+        "Creates an absent row for every enrolled student so you can override individual rows in the Attendance tab.",
+      confirmLabel: "Seed rows"
+    });
+    if (!ok) return;
+    try {
+      const resp = await apiCall<{ seeded: number; notice?: string }>("/api/attendance/seed", {
+        method: "POST",
+        body: JSON.stringify({ lectureId: lecture.id })
+      });
+      alert(
+        `Seeded ${resp.seeded} student row${resp.seeded === 1 ? "" : "s"}.${resp.notice ? `\n\n${resp.notice}` : ""}`
+      );
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed.");
     }
@@ -298,6 +321,9 @@ export function LecturesPanel({
                         ) : null}
                         <button className="button small ghost" type="button" onClick={() => syncAttendance(lecture)}>
                           Sync
+                        </button>
+                        <button className="button small ghost" type="button" onClick={() => seedAttendance(lecture)}>
+                          Mark manually
                         </button>
                         <button className="button small danger" type="button" onClick={() => remove(lecture)}>
                           Delete

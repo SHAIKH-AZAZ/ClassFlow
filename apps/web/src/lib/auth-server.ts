@@ -1,3 +1,4 @@
+import { headers as nextHeaders } from "next/headers";
 import { redirect } from "next/navigation";
 import { NextResponse } from "next/server";
 import type { User } from "@supabase/supabase-js";
@@ -10,19 +11,42 @@ type AuthContext = {
   profile: Profile | null;
 };
 
+async function userFromBearerToken(): Promise<User | null> {
+  try {
+    const headerList = await nextHeaders();
+    const authHeader = headerList.get("authorization") ?? headerList.get("Authorization");
+    if (!authHeader?.toLowerCase().startsWith("bearer ")) return null;
+    const token = authHeader.slice(7).trim();
+    if (!token) return null;
+    const admin = getSupabaseAdmin();
+    const { data, error } = await admin.auth.getUser(token);
+    if (error || !data.user) return null;
+    return data.user;
+  } catch {
+    return null;
+  }
+}
+
 export async function getCurrentAuthContext(): Promise<AuthContext> {
-  const supabase = await getSupabaseServerClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
+  // Bearer token path used by the mobile app.
+  const bearerUser = await userFromBearerToken();
+  let user: User | null = bearerUser;
+
+  if (!user) {
+    const supabase = await getSupabaseServerClient();
+    const {
+      data: { user: cookieUser }
+    } = await supabase.auth.getUser();
+    user = cookieUser;
+  }
 
   if (!user) {
     return { user: null, profile: null };
   }
 
-  // Use the service-role client to read the profile so this works
-  // regardless of how RLS policies are configured. The user is already
-  // authenticated via Supabase auth above; this just enriches the context.
+  // Use the service-role client to read the profile so this works regardless
+  // of RLS configuration. The user is already authenticated above; this just
+  // enriches the context.
   const admin = getSupabaseAdmin();
   const { data: profile } = await admin
     .from("profiles")
