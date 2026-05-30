@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { apiCall, formatDateTime, useApiFetch } from "@/components/use-fetch";
+import { confirmAction } from "@/components/confirm-dialog";
 
 type Notice = {
   id: string;
@@ -53,7 +54,13 @@ export function NoticesClient({
   }
 
   async function remove(notice: Notice) {
-    if (!window.confirm(`Delete "${notice.title}"?`)) return;
+    const ok = await confirmAction({
+      title: `Delete "${notice.title}"?`,
+      description: "Members of the group will no longer see this notice.",
+      confirmLabel: "Delete notice",
+      variant: "danger"
+    });
+    if (!ok) return;
     try {
       await apiCall(`/api/notices/${notice.id}`, { method: "DELETE" });
       reload();

@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { resourceKinds } from "@zoom-lms/shared";
 import { apiCall, apiUpload, formatBytes, formatDateTime, useApiFetch } from "@/components/use-fetch";
+import { confirmAction } from "@/components/confirm-dialog";
 import type { GroupOption } from "./faculty-client";
 
 type Resource = {
@@ -52,7 +53,13 @@ export function ResourcesPanel({ groups, role }: { groups: GroupOption[]; role: 
   }
 
   async function remove(r: Resource) {
-    if (!window.confirm(`Delete resource "${r.title}"? The Drive file will also be removed.`)) return;
+    const ok = await confirmAction({
+      title: `Delete "${r.title}"?`,
+      description: "This removes the resource record and the underlying file from Google Drive.",
+      confirmLabel: "Delete resource",
+      variant: "danger"
+    });
+    if (!ok) return;
     try {
       await apiCall(`/api/resources/${r.id}`, { method: "DELETE" });
       reload();

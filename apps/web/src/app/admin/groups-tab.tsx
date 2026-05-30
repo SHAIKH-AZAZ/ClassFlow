@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { apiCall, firstRel, useApiFetch } from "@/components/use-fetch";
+import { confirmAction } from "@/components/confirm-dialog";
 
 type Group = {
   id: string;
@@ -79,7 +80,21 @@ export function GroupsTab() {
   }
 
   async function remove(group: Group) {
-    if (!window.confirm(`Delete group ${group.name}? Lectures and resources tied to it remain but enrollments will be removed.`)) return;
+    const ok = await confirmAction({
+      title: `Delete group ${group.name}?`,
+      description: (
+        <>
+          Lectures and resources tied to this group remain, but every enrollment is removed and
+          chat threads scoped to it are deleted.
+          <br />
+          <strong>{group.name}</strong> · code <span className="kbd">{group.code}</span> · {group.studentCount} student(s)
+        </>
+      ),
+      confirmLabel: "Delete group",
+      variant: "danger",
+      requireTextMatch: group.code
+    });
+    if (!ok) return;
     try {
       await apiCall(`/api/admin/groups/${group.id}`, { method: "DELETE" });
       if (selectedId === group.id) setSelectedId(null);
@@ -93,7 +108,7 @@ export function GroupsTab() {
   const selected = groups.find((g) => g.id === selectedId) ?? null;
 
   return (
-    <section className="grid two">
+    <section className="grid" style={{ gridTemplateColumns: "minmax(0, 0.8fr) minmax(0, 1.2fr)", gap: 16 }}>
       <article className="card">
         <h2>Create group</h2>
         <form className="form" onSubmit={createGroup}>
@@ -195,7 +210,13 @@ function EnrollmentPanel({
   }
 
   async function remove(rowStudentId: string) {
-    if (!window.confirm("Remove student from group?")) return;
+    const ok = await confirmAction({
+      title: "Remove student from group?",
+      description: "The student will lose access to lectures, recordings, resources, and notices for this group. Their account stays intact.",
+      confirmLabel: "Remove",
+      variant: "danger"
+    });
+    if (!ok) return;
     try {
       await apiCall(`/api/admin/groups/${group.id}/students?studentId=${rowStudentId}`, { method: "DELETE" });
       reload();
@@ -236,34 +257,36 @@ function EnrollmentPanel({
       {data?.enrollments?.length === 0 ? <p className="empty">No students enrolled.</p> : null}
 
       {data?.enrollments && data.enrollments.length > 0 ? (
-        <table>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Roll</th>
-              <th>Email</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.enrollments.map((row) => {
-              const sp = firstRel(row.student_profiles);
-              const profile = firstRel(sp?.profiles);
-              return (
-                <tr key={row.student_id}>
-                  <td>{profile?.full_name ?? "Unknown"}</td>
-                  <td>{sp?.roll_number ?? "-"}</td>
-                  <td>{profile?.email ?? "-"}</td>
-                  <td>
-                    <button className="button small danger" type="button" onClick={() => remove(row.student_id)}>
-                      Remove
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Roll</th>
+                <th>Email</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.enrollments.map((row) => {
+                const sp = firstRel(row.student_profiles);
+                const profile = firstRel(sp?.profiles);
+                return (
+                  <tr key={row.student_id}>
+                    <td>{profile?.full_name ?? "Unknown"}</td>
+                    <td>{sp?.roll_number ?? "-"}</td>
+                    <td>{profile?.email ?? "-"}</td>
+                    <td>
+                      <button className="button small danger" type="button" onClick={() => remove(row.student_id)}>
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       ) : null}
     </>
   );

@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import type { LectureStatus } from "@zoom-lms/shared";
 import { lectureStatuses } from "@zoom-lms/shared";
 import { apiCall, formatDateTime, useApiFetch } from "@/components/use-fetch";
+import { confirmAction } from "@/components/confirm-dialog";
 import type { FacultyOption, GroupOption } from "./faculty-client";
 
 type Lecture = {
@@ -101,7 +102,13 @@ export function LecturesPanel({
   }
 
   async function syncAttendance(lecture: Lecture) {
-    if (!window.confirm(`Sync attendance from Zoom for "${lecture.title}"?`)) return;
+    const ok = await confirmAction({
+      title: `Sync attendance for "${lecture.title}"?`,
+      description:
+        "This pulls participant durations from Zoom and overwrites the attendance rows for this lecture.",
+      confirmLabel: "Sync from Zoom"
+    });
+    if (!ok) return;
     try {
       const resp = await apiCall<{ synced: number }>("/api/attendance/sync", {
         method: "POST",
@@ -114,7 +121,18 @@ export function LecturesPanel({
   }
 
   async function remove(lecture: Lecture) {
-    if (!window.confirm(`Delete lecture "${lecture.title}"? This removes the Zoom meeting record too.`)) return;
+    const ok = await confirmAction({
+      title: `Delete lecture "${lecture.title}"?`,
+      description: (
+        <>
+          The Zoom meeting record, attendance rows, and any recordings linked to this lecture
+          are deleted along with it.
+        </>
+      ),
+      confirmLabel: "Delete lecture",
+      variant: "danger"
+    });
+    if (!ok) return;
     try {
       await apiCall(`/api/lectures/${lecture.id}`, { method: "DELETE" });
       reload();
@@ -222,73 +240,75 @@ export function LecturesPanel({
         {!loading && lectures.length === 0 ? <p className="empty">No lectures yet.</p> : null}
 
         {lectures.length > 0 ? (
-          <table>
-            <thead>
-              <tr>
-                <th>Lecture</th>
-                <th>Group</th>
-                <th>When</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lectures.map((lecture) => (
-                <tr key={lecture.id}>
-                  <td>
-                    <strong>{lecture.title}</strong>
-                    <div className="muted" style={{ fontSize: 12 }}>
-                      {lecture.description ?? ""}
-                    </div>
-                    <div className="muted" style={{ fontSize: 11 }}>
-                      ID <span className="kbd">{lecture.id.slice(0, 8)}</span>
-                    </div>
-                  </td>
-                  <td>
-                    {lecture.groupName} ({lecture.groupCode})
-                  </td>
-                  <td>
-                    {formatDateTime(lecture.startsAt)}
-                    <div className="muted" style={{ fontSize: 12 }}>
-                      until {formatDateTime(lecture.endsAt)}
-                    </div>
-                  </td>
-                  <td>
-                    <select
-                      value={lecture.status}
-                      onChange={(e) => changeStatus(lecture, e.target.value as LectureStatus)}
-                    >
-                      {lectureStatuses.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td>
-                    <div className="actions">
-                      {lecture.zoom?.startUrl ? (
-                        <a className="button small" href={lecture.zoom.startUrl} target="_blank" rel="noreferrer">
-                          Start
-                        </a>
-                      ) : null}
-                      {lecture.zoom?.joinUrl ? (
-                        <button className="button small ghost" type="button" onClick={() => copy(lecture.zoom!.joinUrl)}>
-                          Copy join link
-                        </button>
-                      ) : null}
-                      <button className="button small ghost" type="button" onClick={() => syncAttendance(lecture)}>
-                        Sync attendance
-                      </button>
-                      <button className="button small danger" type="button" onClick={() => remove(lecture)}>
-                        Delete
-                      </button>
-                    </div>
-                  </td>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Lecture</th>
+                  <th>Group</th>
+                  <th>When</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {lectures.map((lecture) => (
+                  <tr key={lecture.id}>
+                    <td>
+                      <strong>{lecture.title}</strong>
+                      <div className="muted" style={{ fontSize: 12 }}>
+                        {lecture.description ?? ""}
+                      </div>
+                      <div className="muted" style={{ fontSize: 11 }}>
+                        ID <span className="kbd">{lecture.id.slice(0, 8)}</span>
+                      </div>
+                    </td>
+                    <td>
+                      {lecture.groupName} ({lecture.groupCode})
+                    </td>
+                    <td>
+                      {formatDateTime(lecture.startsAt)}
+                      <div className="muted" style={{ fontSize: 12 }}>
+                        until {formatDateTime(lecture.endsAt)}
+                      </div>
+                    </td>
+                    <td>
+                      <select
+                        value={lecture.status}
+                        onChange={(e) => changeStatus(lecture, e.target.value as LectureStatus)}
+                      >
+                        {lectureStatuses.map((s) => (
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td>
+                      <div className="actions">
+                        {lecture.zoom?.startUrl ? (
+                          <a className="button small" href={lecture.zoom.startUrl} target="_blank" rel="noreferrer">
+                            Start
+                          </a>
+                        ) : null}
+                        {lecture.zoom?.joinUrl ? (
+                          <button className="button small ghost" type="button" onClick={() => copy(lecture.zoom!.joinUrl)}>
+                            Copy join
+                          </button>
+                        ) : null}
+                        <button className="button small ghost" type="button" onClick={() => syncAttendance(lecture)}>
+                          Sync
+                        </button>
+                        <button className="button small danger" type="button" onClick={() => remove(lecture)}>
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : null}
       </article>
     </section>

@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { roles } from "@zoom-lms/shared";
+import { confirmAction } from "@/components/confirm-dialog";
 import { apiCall, firstRel, formatDate, useApiFetch } from "@/components/use-fetch";
 
 type AdminUser = {
@@ -116,7 +117,20 @@ export function UsersTab() {
   }
 
   async function remove(user: AdminUser) {
-    if (!window.confirm(`Delete ${user.full_name}? This permanently removes the auth user and profile.`)) return;
+    const ok = await confirmAction({
+      title: `Delete ${user.full_name}?`,
+      description: (
+        <>
+          This permanently removes the auth user, profile, and any role-specific records.
+          <br />
+          <strong>{user.email ?? user.full_name}</strong> · role <strong>{user.role}</strong>
+        </>
+      ),
+      confirmLabel: "Delete user",
+      variant: "danger",
+      requireTextMatch: user.full_name
+    });
+    if (!ok) return;
     try {
       await apiCall(`/api/admin/users/${user.id}`, { method: "DELETE" });
       reload();
@@ -133,7 +147,7 @@ export function UsersTab() {
   });
 
   return (
-    <section className="grid two">
+    <div className="grid" style={{ gridTemplateColumns: "1fr", gap: 16 }}>
       <article className="card">
         <h2>Create user</h2>
         <form className="form" onSubmit={onSubmit}>
@@ -230,80 +244,82 @@ export function UsersTab() {
         {!loading && filtered.length === 0 ? <p className="empty">No users match.</p> : null}
 
         {filtered.length > 0 ? (
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Role</th>
-                <th>Email</th>
-                <th>Status</th>
-                <th>Created</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((user) => {
-                const facultyRel = firstRel(user.faculty_profiles);
-                const studentRel = firstRel(user.student_profiles);
-                const facultyId = facultyRel?.id;
-                const studentRoll = studentRel?.roll_number;
-                const zoomHost = facultyRel?.zoom_host_user_id;
-                return (
-                  <tr key={user.id}>
-                    <td>
-                      {user.full_name}
-                      {user.role === "faculty" && zoomHost ? (
-                        <div className="muted" style={{ fontSize: 12 }}>
-                          Zoom: {zoomHost}
-                        </div>
-                      ) : null}
-                      {user.role === "faculty" && !zoomHost ? (
-                        <div className="muted" style={{ fontSize: 12 }}>
-                          No Zoom host
-                        </div>
-                      ) : null}
-                      {studentRoll ? (
-                        <div className="muted" style={{ fontSize: 12 }}>
-                          Roll: {studentRoll}
-                        </div>
-                      ) : null}
-                      {facultyId ? (
-                        <div className="muted" style={{ fontSize: 11 }}>
-                          ID: <span className="kbd">{facultyId.slice(0, 8)}</span>
-                        </div>
-                      ) : null}
-                    </td>
-                    <td>
-                      <span className="chip">{user.role}</span>
-                    </td>
-                    <td>{user.email}</td>
-                    <td>{user.active ? "Active" : "Disabled"}</td>
-                    <td>{formatDate(user.created_at)}</td>
-                    <td>
-                      <div className="actions">
-                        <button className="button small ghost" onClick={() => toggleActive(user)} type="button">
-                          {user.active ? "Disable" : "Enable"}
-                        </button>
-                        <button className="button small ghost" onClick={() => resetPassword(user)} type="button">
-                          Password
-                        </button>
-                        {user.role === "faculty" ? (
-                          <button className="button small ghost" onClick={() => setZoomHost(user)} type="button">
-                            Zoom host
-                          </button>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Role</th>
+                  <th>Email</th>
+                  <th>Status</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((user) => {
+                  const facultyRel = firstRel(user.faculty_profiles);
+                  const studentRel = firstRel(user.student_profiles);
+                  const facultyId = facultyRel?.id;
+                  const studentRoll = studentRel?.roll_number;
+                  const zoomHost = facultyRel?.zoom_host_user_id;
+                  return (
+                    <tr key={user.id}>
+                      <td>
+                        {user.full_name}
+                        {user.role === "faculty" && zoomHost ? (
+                          <div className="muted" style={{ fontSize: 12 }}>
+                            Zoom: {zoomHost}
+                          </div>
                         ) : null}
-                        <button className="button small danger" onClick={() => remove(user)} type="button">
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                        {user.role === "faculty" && !zoomHost ? (
+                          <div className="muted" style={{ fontSize: 12 }}>
+                            No Zoom host
+                          </div>
+                        ) : null}
+                        {studentRoll ? (
+                          <div className="muted" style={{ fontSize: 12 }}>
+                            Roll: {studentRoll}
+                          </div>
+                        ) : null}
+                        {facultyId ? (
+                          <div className="muted" style={{ fontSize: 11 }}>
+                            ID: <span className="kbd">{facultyId.slice(0, 8)}</span>
+                          </div>
+                        ) : null}
+                      </td>
+                      <td>
+                        <span className="chip">{user.role}</span>
+                      </td>
+                      <td>{user.email}</td>
+                      <td>{user.active ? "Active" : "Disabled"}</td>
+                      <td>{formatDate(user.created_at)}</td>
+                      <td>
+                        <div className="actions">
+                          <button className="button small ghost" onClick={() => toggleActive(user)} type="button">
+                            {user.active ? "Disable" : "Enable"}
+                          </button>
+                          <button className="button small ghost" onClick={() => resetPassword(user)} type="button">
+                            Password
+                          </button>
+                          {user.role === "faculty" ? (
+                            <button className="button small ghost" onClick={() => setZoomHost(user)} type="button">
+                              Zoom host
+                            </button>
+                          ) : null}
+                          <button className="button small danger" onClick={() => remove(user)} type="button">
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         ) : null}
       </article>
-    </section>
+    </div>
   );
 }
