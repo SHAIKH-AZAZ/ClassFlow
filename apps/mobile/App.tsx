@@ -20,6 +20,7 @@ import type { Session } from "@supabase/supabase-js";
 import type { AttendanceStatus } from "@zoom-lms/shared";
 import { supabase } from "./src/lib/supabase";
 import { apiCall as serverApi } from "./src/lib/api";
+import { ConfirmHost, confirmAction, pickAction } from "./src/components/confirm-dialog";
 import { LectureComposer } from "./src/screens/lecture-composer";
 import { NoticeComposer } from "./src/screens/notice-composer";
 import { UsersTab } from "./src/screens/users-tab";
@@ -140,15 +141,26 @@ export default function App() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <ActivityIndicator color="#4fb5a7" style={{ marginTop: 60 }} />
+        <ConfirmHost />
       </SafeAreaView>
     );
   }
 
   if (!session) {
-    return <LoginScreen />;
+    return (
+      <>
+        <LoginScreen />
+        <ConfirmHost />
+      </>
+    );
   }
 
-  return <Authed session={session} />;
+  return (
+    <>
+      <Authed session={session} />
+      <ConfirmHost />
+    </>
+  );
 }
 
 function LoginScreen() {
@@ -432,64 +444,62 @@ function ScheduleTab({ scope }: { scope: Scope }) {
   }
 
   async function syncAttendance(lectureId: string, title: string) {
-    Alert.alert(
-      `Take attendance for "${title}"?`,
-      "Tries to sync from Zoom (Paid plan). On Basic, seeds an absent row for every enrolled student so you can mark presence by tapping rows in the Attendance tab.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Sync from Zoom",
-          onPress: async () => {
-            try {
-              const resp = await serverApi<{ synced: number; notice?: string | null }>("/api/attendance/sync", {
-                method: "POST",
-                body: JSON.stringify({ lectureId })
-              });
-              const lines = [`Synced ${resp.synced} attendance row${resp.synced === 1 ? "" : "s"}.`];
-              if (resp.notice) lines.push(resp.notice);
-              Alert.alert("Done", lines.join("\n\n"));
-            } catch (err) {
-              Alert.alert("Sync failed", err instanceof Error ? err.message : "");
-            }
-          }
-        },
-        {
-          text: "Seed manual",
-          onPress: async () => {
-            try {
-              const resp = await serverApi<{ seeded: number; notice?: string }>("/api/attendance/seed", {
-                method: "POST",
-                body: JSON.stringify({ lectureId })
-              });
-              Alert.alert(
-                "Ready to mark",
-                `Seeded ${resp.seeded} student row${resp.seeded === 1 ? "" : "s"}. Open the Attendance tab and tap a row to mark Present/Late/Excused.${resp.notice ? `\n\n${resp.notice}` : ""}`
-              );
-            } catch (err) {
-              Alert.alert("Seed failed", err instanceof Error ? err.message : "");
-            }
-          }
-        }
-      ]
-    );
+    const choice = await confirmAction({
+      title: `Take attendance for "${title}"?`,
+      message:
+        "Sync from Zoom requires a Paid Zoom plan. Seed manual creates an absent row for every enrolled student so you can mark presence in the Attendance tab.",
+      confirmLabel: "Sync from Zoom"
+    });
+    if (!choice.ok) return;
+    try {
+      const resp = await serverApi<{ synced: number; notice?: string | null }>("/api/attendance/sync", {
+        method: "POST",
+        body: JSON.stringify({ lectureId })
+      });
+      const lines = [`Synced ${resp.synced} attendance row${resp.synced === 1 ? "" : "s"}.`];
+      if (resp.notice) lines.push(resp.notice);
+      Alert.alert("Done", lines.join("\n\n"));
+    } catch (err) {
+      Alert.alert("Sync failed", err instanceof Error ? err.message : "");
+    }
+  }
+
+  async function seedAttendance(lectureId: string, title: string) {
+    const choice = await confirmAction({
+      title: `Mark attendance manually for "${title}"?`,
+      message:
+        "Creates an absent row for every enrolled student. Faculty can then tap each row in the Attendance tab to mark Present, Late, or Excused. Existing overrides are preserved.",
+      confirmLabel: "Seed rows"
+    });
+    if (!choice.ok) return;
+    try {
+      const resp = await serverApi<{ seeded: number; notice?: string }>("/api/attendance/seed", {
+        method: "POST",
+        body: JSON.stringify({ lectureId })
+      });
+      Alert.alert(
+        "Ready to mark",
+        `Seeded ${resp.seeded} student row${resp.seeded === 1 ? "" : "s"}. Open the Attendance tab and tap a row to set the status.${resp.notice ? `\n\n${resp.notice}` : ""}`
+      );
+    } catch (err) {
+      Alert.alert("Seed failed", err instanceof Error ? err.message : "");
+    }
   }
 
   async function deleteLecture(lectureId: string, title: string) {
-    Alert.alert(`Delete "${title}"?`, "This removes the Zoom meeting and any recordings tied to it.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await serverApi(`/api/lectures/${lectureId}`, { method: "DELETE" });
-            await load();
-          } catch (err) {
-            Alert.alert("Failed", err instanceof Error ? err.message : "");
-          }
-        }
-      }
-    ]);
+    const choice = await confirmAction({
+      title: `Delete "${title}"?`,
+      message: "Removes the Zoom meeting record, all attendance rows, and any recordings tied to this lecture.",
+      confirmLabel: "Delete lecture",
+      variant: "danger"
+    });
+    if (!choice.ok) return;
+    try {
+      await serverApi(`/api/lectures/${lectureId}`, { method: "DELETE" });
+      await load();
+    } catch (err) {
+      Alert.alert("Delete failed", err instanceof Error ? err.message : "");
+    }
   }
 
   useEffect(() => {
@@ -547,9 +557,12 @@ function ScheduleTab({ scope }: { scope: Scope }) {
                 )}
               </View>
               {canCompose ? (
-                <View style={[styles.row, { marginTop: 8, gap: 8 }]}>
+                <View style={[styles.actionRow, { marginTop: 8 }]}>
                   <Pressable onPress={() => syncAttendance(item.id, item.title)} style={styles.buttonGhost}>
-                    <Text style={styles.buttonText}>Sync attendance</Text>
+                    <Text style={styles.buttonText}>Sync</Text>
+                  </Pressable>
+                  <Pressable onPress={() => seedAttendance(item.id, item.title)} style={styles.buttonGhost}>
+                    <Text style={styles.buttonText}>Mark manually</Text>
                   </Pressable>
                   <Pressable
                     onPress={() => deleteLecture(item.id, item.title)}
@@ -746,44 +759,37 @@ function AttendanceTab({ scope }: { scope: Scope }) {
 
   function override(row: AttendanceRow) {
     const choices: AttendanceStatus[] = ["present", "absent", "late", "excused"];
-    Alert.alert(
-      "Override status",
-      `Current: ${row.status}`,
-      [
-        ...choices.map((status) => ({
-          text: status.charAt(0).toUpperCase() + status.slice(1),
-          onPress: () => askReason(row, status)
-        })),
-        { text: "Cancel", style: "cancel" as const }
-      ]
-    );
+    pickAction({
+      title: "Override status",
+      message: `Current: ${row.status}`,
+      choices: choices.map((status) => ({
+        value: status,
+        label: status.charAt(0).toUpperCase() + status.slice(1),
+        variant: status === "absent" ? "danger" : "default"
+      }))
+    }).then((picked) => {
+      if (picked) askReason(row, picked as AttendanceStatus);
+    });
   }
 
-  function askReason(row: AttendanceRow, status: AttendanceStatus) {
+  async function askReason(row: AttendanceRow, status: AttendanceStatus) {
     if (status === row.status) return;
-    Alert.prompt(
-      `Mark ${status}`,
-      "Reason for the correction:",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Save",
-          onPress: async (reason?: string) => {
-            if (!reason) return;
-            try {
-              await serverApi("/api/attendance/override", {
-                method: "POST",
-                body: JSON.stringify({ attendanceId: row.id, status, reason })
-              });
-              await load();
-            } catch (err) {
-              Alert.alert("Failed", err instanceof Error ? err.message : "");
-            }
-          }
-        }
-      ],
-      "plain-text"
-    );
+    const result = await confirmAction({
+      title: `Mark ${status}`,
+      message: `Update attendance from ${row.status} to ${status}.`,
+      confirmLabel: "Save",
+      prompt: { label: "Reason for the correction", placeholder: "e.g. arrived 10 min late", required: true }
+    });
+    if (!result.ok) return;
+    try {
+      await serverApi("/api/attendance/override", {
+        method: "POST",
+        body: JSON.stringify({ attendanceId: row.id, status, reason: result.value })
+      });
+      await load();
+    } catch (err) {
+      Alert.alert("Override failed", err instanceof Error ? err.message : "");
+    }
   }
 
   useEffect(() => {
@@ -872,21 +878,19 @@ function NoticesTab({ scope }: { scope: Scope }) {
   }
 
   async function deleteNotice(id: string, title: string) {
-    Alert.alert(`Delete "${title}"?`, "", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await serverApi(`/api/notices/${id}`, { method: "DELETE" });
-            await load();
-          } catch (err) {
-            Alert.alert("Failed", err instanceof Error ? err.message : "");
-          }
-        }
-      }
-    ]);
+    const choice = await confirmAction({
+      title: `Delete "${title}"?`,
+      message: "Members of this audience will no longer see the notice.",
+      confirmLabel: "Delete notice",
+      variant: "danger"
+    });
+    if (!choice.ok) return;
+    try {
+      await serverApi(`/api/notices/${id}`, { method: "DELETE" });
+      await load();
+    } catch (err) {
+      Alert.alert("Delete failed", err instanceof Error ? err.message : "");
+    }
   }
 
   useEffect(() => {
@@ -1161,6 +1165,11 @@ const styles = StyleSheet.create({
     color: "#98a2b3",
     textAlign: "center",
     marginTop: 40
+  },
+  actionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
   },
   label: {
     color: "#98a2b3",

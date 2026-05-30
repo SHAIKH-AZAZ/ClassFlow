@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { CenterModal } from "../components/modal";
+import { confirmAction } from "../components/confirm-dialog";
 import { DangerButton, Field, Input, PrimaryButton, SecondaryButton } from "../components/forms";
 import { apiCall } from "../lib/api";
 
@@ -62,25 +63,21 @@ export function UsersTab() {
   }
 
   function confirmDelete(user: AdminUser) {
-    Alert.alert(
-      `Delete ${user.full_name}?`,
-      "This permanently removes the auth user and profile.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await apiCall(`/api/admin/users/${user.id}`, { method: "DELETE" });
-              load();
-            } catch (err) {
-              Alert.alert("Failed", err instanceof Error ? err.message : "");
-            }
-          }
-        }
-      ]
-    );
+    confirmAction({
+      title: `Delete ${user.full_name}?`,
+      message: `${user.email ?? "no email"} · role ${user.role}. This permanently removes the auth user, profile, and any role-specific records.`,
+      confirmLabel: "Delete user",
+      variant: "danger",
+      prompt: { label: "Type the full name to confirm:", placeholder: user.full_name, required: true, mustEqual: user.full_name }
+    }).then(async (res) => {
+      if (!res.ok) return;
+      try {
+        await apiCall(`/api/admin/users/${user.id}`, { method: "DELETE" });
+        load();
+      } catch (err) {
+        Alert.alert("Delete failed", err instanceof Error ? err.message : "");
+      }
+    });
   }
 
   if (!users) return <ActivityIndicator color="#4fb5a7" style={{ marginTop: 30 }} />;

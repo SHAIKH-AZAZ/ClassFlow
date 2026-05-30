@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { CenterModal } from "../components/modal";
+import { confirmAction } from "../components/confirm-dialog";
 import { DangerButton, Field, Input, PrimaryButton, SecondaryButton } from "../components/forms";
 import { apiCall } from "../lib/api";
 
@@ -66,25 +67,21 @@ export function GroupsTab() {
   }, []);
 
   function confirmDelete(group: Group) {
-    Alert.alert(
-      `Delete ${group.name}?`,
-      `Code ${group.code} · ${group.studentCount} student(s).`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await apiCall(`/api/admin/groups/${group.id}`, { method: "DELETE" });
-              load();
-            } catch (err) {
-              Alert.alert("Failed", err instanceof Error ? err.message : "");
-            }
-          }
-        }
-      ]
-    );
+    confirmAction({
+      title: `Delete ${group.name}?`,
+      message: `Code ${group.code} · ${group.studentCount} student(s). Lectures and resources tied to it remain but enrollments are removed.`,
+      confirmLabel: "Delete group",
+      variant: "danger",
+      prompt: { label: "Type the group code to confirm:", placeholder: group.code, required: true, mustEqual: group.code }
+    }).then(async (res) => {
+      if (!res.ok) return;
+      try {
+        await apiCall(`/api/admin/groups/${group.id}`, { method: "DELETE" });
+        load();
+      } catch (err) {
+        Alert.alert("Delete failed", err instanceof Error ? err.message : "");
+      }
+    });
   }
 
   async function toggle(group: Group) {
