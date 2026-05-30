@@ -136,6 +136,11 @@ export function LecturesPanel({
     <section className="grid two">
       <article className="card">
         <h2>Schedule lecture</h2>
+        {role === "faculty" && !facultyProfileId ? (
+          <p className="form-message error">
+            No faculty profile is linked to your account. Ask the admin to set one before scheduling.
+          </p>
+        ) : null}
         <form className="form" onSubmit={createLecture}>
           <label>
             Title
@@ -164,8 +169,9 @@ export function LecturesPanel({
                 onChange={(e) => setForm({ ...form, facultyId: e.target.value })}
                 disabled={role === "faculty"}
                 required
+                title={role === "faculty" ? "Faculty can only schedule for themselves." : undefined}
               >
-                <option value="">Select…</option>
+                {role === "faculty" ? null : <option value="">Select…</option>}
                 {(role === "faculty" && facultyProfileId
                   ? faculties.filter((f) => f.id === facultyProfileId)
                   : faculties
@@ -176,6 +182,9 @@ export function LecturesPanel({
                   </option>
                 ))}
               </select>
+              {role === "faculty" ? (
+                <span className="muted" style={{ fontSize: 12 }}>Locked to your account.</span>
+              ) : null}
             </label>
           </div>
           <div className="form-row">
