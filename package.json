@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "dev": "bun --filter web dev",
-    "dev:mobile": "bun --filter mobile start",
+    "dev:mobile": "cd apps/mobile && bunx expo start",
     "dev:worker": "bun --filter worker dev",
     "build": "bun --filter @zoom-lms/shared build && bun --filter web build && bun --filter worker build",
     "start": "bun --filter web start",
