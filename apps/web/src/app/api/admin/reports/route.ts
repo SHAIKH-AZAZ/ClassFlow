@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireApiRole } from "@/lib/auth-server";
+import { autoCompleteOverdueLectures } from "@/lib/lecture-status";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export async function GET() {
@@ -7,6 +8,7 @@ export async function GET() {
   if (auth.error) return auth.error;
 
   const supabase = getSupabaseAdmin();
+  await autoCompleteOverdueLectures(supabase);
   const [profiles, lectures, attendance, recordings, resources, jobs] = await Promise.all([
     supabase.from("profiles").select("id, role, active"),
     supabase.from("lectures").select("id, status, starts_at"),

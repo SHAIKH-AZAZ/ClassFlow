@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { createZoomMeeting } from "@/lib/zoom";
 import { optionalNumberEnv } from "@/lib/env";
 import { minutesBetween } from "@/lib/attendance";
+import { autoCompleteOverdueLectures } from "@/lib/lecture-status";
 import { getFacultyProfileIdForUser, requireApiRole } from "@/lib/auth-server";
 
 export async function GET(request: Request) {
@@ -11,6 +12,7 @@ export async function GET(request: Request) {
   if (auth.error) return auth.error;
 
   const supabase = getSupabaseAdmin();
+  await autoCompleteOverdueLectures(supabase);
   const url = new URL(request.url);
   const groupId = url.searchParams.get("groupId");
   const facultyId = url.searchParams.get("facultyId");

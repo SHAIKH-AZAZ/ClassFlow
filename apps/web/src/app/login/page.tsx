@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { LoginForm } from "./login-form";
 
 export default function LoginPage() {
@@ -7,7 +8,9 @@ export default function LoginPage() {
         <p className="eyebrow">Institute Zoom LMS</p>
         <h1>Sign in</h1>
         <p className="muted">Use the email and password created in Supabase Auth.</p>
-        <LoginForm />
+        <Suspense fallback={<p className="muted">Loading…</p>}>
+          <LoginForm />
+        </Suspense>
       </section>
     </main>
   );
